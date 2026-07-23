@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fanfare · Alert Box</title>
+<link rel="stylesheet" href="/shared/overlay.css" />
+<style>
+  .wrap { display: flex; align-items: flex-start; justify-content: center; padding-top: 8vh; }
+  .alert {
+    min-width: 460px; max-width: 720px;
+    background: rgba(15, 15, 22, 0.82);
+    border-radius: 18px;
+    padding: 26px 34px;
+    text-align: center;
+    box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    border-top: 5px solid var(--accent, #a970ff);
+    backdrop-filter: blur(6px);
+  }
+  .alert .icon { font-size: 60px; line-height: 1; filter: drop-shadow(0 6px 14px rgba(0,0,0,.4)); }
+  .alert .title {
+    font-size: 34px; font-weight: 800; margin: 10px 0 4px;
+    color: var(--accent, #a970ff);
+    text-shadow: 0 2px 12px rgba(0,0,0,.5);
+  }
+  .alert .title .name { color: #fff; }
+  .alert .msg { font-size: 20px; opacity: .92; font-style: italic; margin-top: 8px; }
+  .alert.layout-side { display: flex; align-items: center; text-align: left; gap: 22px; }
+  .alert.layout-side .icon { font-size: 72px; }
+  .glow { box-shadow: 0 0 0 3px var(--accent), 0 0 40px var(--accent), 0 24px 60px rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+<div class="stack wrap"><div id="host"></div></div>
+
+<script type="module">
+import { $, el, connect, api, playSound, param, escapeHtml } from "/shared/sf.js";
+
+const ICONS = {
+  follow: "💜", subscription: "⭐", gift_sub: "🎁", donation: "💰",
+  cheer: "💎", raid: "⚔️", host: "📺", merch: "🛍️", redemption: "🎫",
+};
+
+let alerts = {};
+let general = { currency: "$" };
+const host = $("#host");
+const queue = [];
+let busy = false;
+
+if (param("bg")) document.body.classList.add("preview");
+
+function render(tpl, ev) {
+  return escapeHtml(tpl
+    .replaceAll("{amount}", ev.amount != null ? `${general.currency}${ev.amount}` : "")
+    .replaceAll("{count}", ev.count ?? "")
+    .replaceAll("{months}", ev.months ?? 1)
+    .replaceAll("{tier}", ev.tier ?? 1)
+    .replaceAll("{message}", "")
+    .replace(/\s+/g, " ").trim())
+    .replace("{name}", `<span class="name">${escapeHtml(ev.name)}</span>`)
+    .replaceAll("{name}", escapeHtml(ev.name));
+}
+
+async function show(ev) {
+  const cfg = alerts[ev.type] ?? {};
+  if (cfg.enabled === false) return next();
+  if (cfg.minAmount && (ev.amount ?? 0) < cfg.minAmount) return next();
+
+  const anim = { slide: "sf-slide-in", fade: "sf-fade-in", pop: "sf-pop-in", wipe: "sf-wipe-in" }[cfg.animationIn] || "sf-slide-in";
+  const card = el("div", { class: `alert layout-${cfg.layout || "top"} glow` });
+  card.style.setProperty("--accent", cfg.accent || "#a970ff");
+  card.style.color = cfg.textColor || "#fff";
+  card.style.animation = `${anim} .6s cubic-bezier(.2,.8,.2,1) both`;
+
+  const icon = el("div", { class: "icon" }, ICONS[ev.type] || "✨");
+  const title = el("div", { class: "title", html: render(cfg.message || "{name}", ev) });
+  const showMsg = ev.message && (ev.type === "donation" || ev.type === "cheer");
+  const msg = showMsg ? el("div", { class: "msg" }, `“${ev.message}”`) : null;
+
+  if (cfg.layout === "side") {
+    const textCol = el("div", {}, title);
+    if (msg) textCol.append(msg);
+    card.append(icon, textCol);
+  } else {
+    card.append(icon, title);
+    if (msg) card.append(msg);
+  }
+  host.replaceChildren(card);
+
+  playSound(cfg.sound || "chime", cfg.soundVolume ?? 0.6);
+
+  const dur = cfg.duration || 6000;
+  await wait(dur);
+  card.style.animation = "sf-out .45s ease forwards";
+  await wait(450);
+  host.replaceChildren();
+  next();
+}
+
+function next() {
+  busy = false;
+  if (queue.length) { busy = true; show(queue.shift()); }
+}
+function enqueue(ev) {
+  queue.push(ev);
+  if (!busy) { busy = true; show(queue.shift()); }
+}
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function boot() {
+  const cfg = await api("config");
+  alerts = cfg.alerts || {};
+  general = cfg.general || general;
+}
+boot();
+
+connect((msg) => {
+  if (msg.kind === "alert") enqueue(msg.event);
+  if (msg.kind === "config" && msg.scope === "alerts") boot();
+  if (msg.kind === "config" && msg.scope === "general") boot();
+});
+</script>
+</body>
+</html>
