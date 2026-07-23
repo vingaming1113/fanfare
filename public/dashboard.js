@@ -22,6 +22,7 @@ const SECTION_META = {
   polls:    ["Polls", "Run interactive audience polls on your overlay."],
   loyalty:  ["Loyalty", "Channel points leaderboard and top tippers."],
   widgets:  ["Widgets", "Browser-source URLs to drop into OBS."],
+  connect:  ["Connect", "Link a real Twitch channel — no login or API key required."],
   settings: ["Settings", "Channel name, currency and loyalty configuration."],
 };
 
@@ -359,6 +360,62 @@ function renderWidgets() {
   }
 }
 
+// ---------- CONNECT (real integrations) ----------
+function renderConnect() {
+  const root = $("#sec-connect");
+  const tw = state.twitch || { enabled: false, channel: "", connected: false };
+  const channel = input("text", tw.channel || state.general?.channelName || "", { placeholder: "your_twitch_channel" });
+  root.replaceChildren(
+    el("div", { class: "card", style: { marginBottom: "16px" } },
+      el("h3", {}, "Twitch"),
+      el("p", { style: { color: "var(--muted)", fontSize: "14px", marginBottom: "14px" } },
+        "Connect to a live Twitch channel and real activity flows straight into your alerts, goals, hype train and loyalty — ",
+        el("strong", {}, "no login, OAuth or API key needed"), " (anonymous read-only chat connection)."),
+      el("div", { class: "spread", id: "twStatusRow", style: { marginBottom: "14px" } }, twStatusBadge(tw)),
+      field("Channel name", channel),
+      el("div", { class: "row" },
+        el("button", { class: "btn primary", onClick: async () => {
+          state.twitch = await api("integrations/twitch", "POST", { enabled: true, channel: channel.value });
+          paintTwitch(state.twitch); toast("Connecting to Twitch…");
+        } }, "Connect"),
+        el("button", { class: "btn danger", onClick: async () => {
+          state.twitch = await api("integrations/twitch", "POST", { enabled: false, channel: channel.value });
+          paintTwitch(state.twitch); toast("Disconnected");
+        } }, "Disconnect"))),
+    el("div", { class: "card" },
+      el("h3", {}, "What comes through"),
+      el("table", {},
+        el("tbody", {},
+          trow("💬 Chat messages", "Live", "var(--good)"),
+          trow("⭐ Subs & resubs", "Live", "var(--good)"),
+          trow("🎁 Gift subs & community gifts", "Live", "var(--good)"),
+          trow("⚔️ Raids", "Live", "var(--good)"),
+          trow("💎 Bits / cheers", "Live", "var(--good)"),
+          trow("💜 Follows", "Needs auth (EventSub)", "var(--muted)"),
+          trow("💰 Tips", "Via /tip page or webhook", "var(--muted)"))),
+      el("p", { style: { color: "var(--muted)", fontSize: "13px", marginTop: "10px" } },
+        "Follows aren't exposed on Twitch's anonymous stream. Everything else is real and live.")),
+  );
+}
+function trow(label, status, color) {
+  return el("tr", {}, el("td", {}, label), el("td", { class: "num", style: { color } }, status));
+}
+function twStatusBadge(tw) {
+  const on = tw.connected;
+  const color = on ? "var(--good)" : tw.enabled ? "var(--warn)" : "var(--muted)";
+  const label = on ? `Connected to #${tw.channel}` : tw.enabled ? `Connecting to #${tw.channel}…` : "Not connected";
+  return el("span", { style: { fontWeight: "700" } }, el("span", { class: "dot", style: { background: color } }), " " + label + (tw.lastError ? ` — ${tw.lastError}` : ""));
+}
+function paintTwitch(tw) {
+  if (!tw) return;
+  state.twitch = tw;
+  const row = $("#twStatusRow");
+  if (row) row.replaceChildren(twStatusBadge(tw));
+  const dot = $("#twdot"), st = $("#twstate");
+  if (dot) { dot.classList.toggle("on", tw.connected); dot.style.background = tw.connected ? "" : tw.enabled ? "var(--warn)" : ""; }
+  if (st) st.textContent = tw.connected ? `#${tw.channel}` : tw.enabled ? "connecting" : "off";
+}
+
 // ---------- SETTINGS ----------
 function renderSettings() {
   const root = $("#sec-settings");
@@ -412,27 +469,31 @@ async function testAlert(type) {
 const RENDER = {
   overview: renderOverview, alerts: renderAlerts, goals: renderGoals,
   hype: renderHype, polls: renderPolls, loyalty: renderLoyalty,
-  widgets: renderWidgets, settings: renderSettings,
+  widgets: renderWidgets, connect: renderConnect, settings: renderSettings,
 };
 function switchTo(sec) {
+  if (!SECTION_META[sec]) sec = "overview";
   $$("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.sec === sec));
   $$(".section").forEach((s) => s.classList.toggle("active", s.id === "sec-" + sec));
   const [title, sub] = SECTION_META[sec];
   $("#secTitle").textContent = title;
   $("#secSub").textContent = sub;
+  if (location.hash.slice(1) !== sec) history.replaceState(null, "", "#" + sec);
   RENDER[sec]?.();
 }
 $("#nav").addEventListener("click", (e) => {
   const a = e.target.closest("a[data-sec]");
   if (a) switchTo(a.dataset.sec);
 });
+window.addEventListener("hashchange", () => switchTo(location.hash.slice(1)));
 
 // simulator toggle
 let simRunning = false;
 function paintSim() {
   $("#simdot").classList.toggle("on", simRunning);
   $("#simstate").textContent = simRunning ? "on" : "off";
-  $("#simBtn").textContent = simRunning ? "⏸ Stop Simulator" : "▶ Start Simulator";
+  $("#simBtn").textContent = simRunning ? "⏸ Stop Demo" : "▶ Demo Simulator";
+  $("#simBtn").title = "Generate fake events to preview the system without a live channel";
 }
 $("#simBtn").addEventListener("click", async () => {
   const r = await api(`sim/${simRunning ? "stop" : "start"}`, "POST");
@@ -459,6 +520,7 @@ function handleLive(msg) {
     if (cf) { cf.append(chatItem(msg.message)); while (cf.children.length > 40) cf.firstChild.remove(); cf.scrollTop = cf.scrollHeight; }
   }
   if (msg.kind === "poll") { state.poll = msg.poll; if ($("#activePoll")) paintPoll(msg.poll); }
+  if (msg.kind === "integration") paintTwitch(msg.twitch);
   if (msg.kind === "goal") {
     const list = state.goals || [];
     const idx = list.findIndex((g) => g.id === msg.goal.id);
@@ -469,7 +531,8 @@ function handleLive(msg) {
 (async function boot() {
   await refresh();
   paintSim();
-  switchTo("overview");
+  paintTwitch(state.twitch);
+  switchTo(location.hash.slice(1) || "overview");
   connect(handleLive, () => { $("#wsdot").classList.add("on"); $("#wsstatus").textContent = "connected"; });
   // keep hype timer ticking
   setInterval(() => { if ($("#hypeInfo") && state.hype) paintHypeLive(state.hype); }, 1000);
