@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fanfare · Poll</title>
+<link rel="stylesheet" href="/shared/overlay.css" />
+<style>
+  .wrap { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: flex-end; padding: 20px; }
+  .poll { width: 360px; background: rgba(15,15,22,.86); border-radius: 16px; padding: 18px; box-shadow: 0 14px 40px rgba(0,0,0,.5); transition: opacity .4s ease, transform .4s ease; }
+  .poll.hidden { opacity: 0; transform: translateX(40px); pointer-events: none; }
+  .q { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+  .sub { font-size: 13px; opacity: .7; margin-bottom: 12px; }
+  .opt { margin-bottom: 10px; }
+  .opt .l { display: flex; justify-content: space-between; font-size: 15px; margin-bottom: 4px; }
+  .opt .l .pc { font-variant-numeric: tabular-nums; opacity: .85; }
+  .track { height: 14px; border-radius: 8px; background: rgba(255,255,255,.1); overflow: hidden; }
+  .track .f { height: 100%; width: 0%; border-radius: 8px; transition: width .5s ease; }
+</style>
+</head>
+<body>
+<div class="wrap"><div class="poll hidden" id="poll"></div></div>
+<script type="module">
+import { $, el, connect, api, param } from "/shared/sf.js";
+if (param("bg")) document.body.classList.add("preview");
+const COLORS = ["#a970ff","#22d3ee","#34d399","#fbbf24","#f472b6","#fb7185"];
+const box = $("#poll");
+
+function paint(p) {
+  if (!p || !p.active) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  const total = p.totalVotes || 0;
+  box.replaceChildren(
+    el("div", { class: "q" }, p.question),
+    el("div", { class: "sub" }, `${total} vote${total === 1 ? "" : "s"} · type !vote <n> in chat`),
+    ...p.options.map((opt, i) => {
+      const pct = total ? (p.votes[i] / total) * 100 : 0;
+      const row = el("div", { class: "opt" },
+        el("div", { class: "l" },
+          el("span", {}, `${i + 1}. ${opt}`),
+          el("span", { class: "pc" }, `${pct.toFixed(0)}%`)),
+        el("div", { class: "track" },
+          el("div", { class: "f", style: { background: COLORS[i % COLORS.length] } })));
+      requestAnimationFrame(() => { row.querySelector(".f").style.width = pct + "%"; });
+      return row;
+    }),
+  );
+}
+api("poll").then(paint);
+connect((msg) => { if (msg.kind === "poll") paint(msg.poll); });
+</script>
+</body>
+</html>

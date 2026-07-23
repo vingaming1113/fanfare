@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fanfare · Leaderboard</title>
+<link rel="stylesheet" href="/shared/overlay.css" />
+<style>
+  .wrap { position: absolute; inset: 0; padding: 16px; }
+  .board { width: 320px; background: rgba(15,15,22,.82); border-radius: 16px; padding: 16px 18px; box-shadow: 0 12px 30px rgba(0,0,0,.4); }
+  .board h2 { font-size: 15px; letter-spacing: 2px; text-transform: uppercase; opacity: .7; margin-bottom: 12px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .row:last-child { border-bottom: 0; }
+  .rank { width: 26px; font-weight: 900; text-align: center; opacity: .85; }
+  .row:nth-child(2) .rank { color: #fbbf24; } .row:nth-child(3) .rank { color: #cbd5e1; } .row:nth-child(4) .rank { color: #f59e0b; }
+  .nm { flex: 1; font-weight: 700; }
+  .pts { font-variant-numeric: tabular-nums; color: #a970ff; font-weight: 800; }
+</style>
+</head>
+<body>
+<div class="wrap"><div class="board" id="board"></div></div>
+<script type="module">
+import { $, el, api, connect, param, fmt } from "/shared/sf.js";
+if (param("bg")) document.body.classList.add("preview");
+const board = $("#board");
+const MAX = Number(param("max", 8));
+const mode = param("mode", "points"); // points | donors
+let pointsName = "Sparks", currency = "$";
+
+async function boot() {
+  const cfg = await api("config");
+  pointsName = cfg.general?.pointsName ?? "Sparks";
+  currency = cfg.general?.currency ?? "$";
+  render();
+}
+async function render() {
+  const rows = await api(mode === "donors" ? `donors?limit=${MAX}` : `leaderboard?limit=${MAX}`);
+  board.replaceChildren(
+    el("h2", {}, mode === "donors" ? "Top Tippers" : `Top ${pointsName}`),
+    ...rows.map((v, i) => el("div", { class: "row" },
+      el("div", { class: "rank" }, "#" + (i + 1)),
+      el("div", { class: "nm", style: { color: "#fff" } }, v.name),
+      el("div", { class: "pts" }, mode === "donors" ? `${currency}${fmt(v.donated)}` : fmt(v.points)),
+    )),
+  );
+}
+boot();
+let t; connect((msg) => { if (msg.kind === "alert" || msg.kind === "chat") { clearTimeout(t); t = setTimeout(render, 1200); } });
+</script>
+</body>
+</html>
