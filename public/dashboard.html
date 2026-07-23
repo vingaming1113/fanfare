@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fanfare · Dashboard</title>
+<link rel="stylesheet" href="/dashboard.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <span class="logo">🎺</span>
+      <div>Fanfare<small>stream control</small></div>
+    </div>
+    <nav class="nav" id="nav">
+      <a data-sec="overview" class="active"><span class="ico">📊</span> Overview</a>
+      <a data-sec="alerts"><span class="ico">🔔</span> Alerts</a>
+      <a data-sec="goals"><span class="ico">🎯</span> Goals</a>
+      <a data-sec="hype"><span class="ico">🚂</span> Hype Train</a>
+      <a data-sec="polls"><span class="ico">🗳️</span> Polls</a>
+      <a data-sec="loyalty"><span class="ico">🏆</span> Loyalty</a>
+      <a data-sec="widgets"><span class="ico">🧩</span> Widgets</a>
+      <a data-sec="settings"><span class="ico">⚙️</span> Settings</a>
+    </nav>
+    <div class="status">
+      <div><span class="dot" id="wsdot"></span><span id="wsstatus">connecting…</span></div>
+      <div style="margin-top:8px"><span class="dot" id="simdot"></span>simulator <span id="simstate">off</span></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="head">
+      <div>
+        <h1 id="secTitle">Overview</h1>
+        <p id="secSub">Live snapshot of your stream.</p>
+      </div>
+      <div class="row">
+        <button class="btn" id="simBtn">▶ Start Simulator</button>
+      </div>
+    </div>
+
+    <section class="section active" id="sec-overview"></section>
+    <section class="section" id="sec-alerts"></section>
+    <section class="section" id="sec-goals"></section>
+    <section class="section" id="sec-hype"></section>
+    <section class="section" id="sec-polls"></section>
+    <section class="section" id="sec-loyalty"></section>
+    <section class="section" id="sec-widgets"></section>
+    <section class="section" id="sec-settings"></section>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<script type="module" src="/dashboard.js"></script>
+</body>
+</html>
