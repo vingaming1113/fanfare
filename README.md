@@ -29,6 +29,29 @@ No SaaS account, no cloud lock-in. One Bun process serves the control-panel dash
 
 Append `?bg=1` to any overlay to preview it on a checkerboard background.
 
+### 🔴 Real Twitch integration — no login required
+Point Fanfare at a Twitch channel and **real, live activity** flows straight into
+your alerts, goals, hype train and loyalty system. It connects to Twitch chat over
+an **anonymous, read-only IRC-over-WebSocket** guest session — **no OAuth, no API
+key, no bot account, nothing to register.** Just type a channel name and hit
+**Connect** on the dashboard's **Connect** tab.
+
+What comes through live:
+
+| Event | Source | Status |
+| --- | --- | --- |
+| Chat messages | Twitch IRC `PRIVMSG` | ✅ live |
+| Subscriptions & resubs | `USERNOTICE` | ✅ live |
+| Gift subs & community (mystery) gifts | `USERNOTICE` | ✅ live |
+| Raids | `USERNOTICE` | ✅ live |
+| Bits / cheers | `PRIVMSG` bits tag | ✅ live |
+| Follows | requires authenticated EventSub | ⚠️ not on the anonymous stream |
+| Tips | `/tip` page or `POST /api/tip` webhook | ✅ real |
+
+The connector auto-reconnects with backoff and answers Twitch keepalive pings, so
+it survives long streams. Follows are the one common event Twitch does not expose
+anonymously — see the roadmap for the optional EventSub path.
+
 ### 🚂 Hype Train — the original feature
 A real-time **community energy engine**. Every event injects weighted "energy" into a live meter that **decays every second**, so the train only keeps rolling while the community stays active. Fill the meter to level up — each level extends the window and escalates the on-screen celebration (screen shake, confetti burst, sound). If the timer runs out before the next level, the train "leaves the station" and resets. The channel's **all-time record level** is tracked and celebrated when beaten. Every weight and threshold is tunable from the dashboard.
 
@@ -56,7 +79,7 @@ bun start          # or: bun run dev  (watch mode)
 
 Then open **http://localhost:4700/dashboard**.
 
-Click **▶ Start Simulator** in the top right to watch alerts, chat, goals and the Hype Train come alive, or use the **Quick Test Alerts** buttons.
+Open the **Connect** tab and enter a Twitch channel to go live with real events, or click **▶ Demo Simulator** in the top right to watch alerts, chat, goals and the Hype Train come alive with fake traffic. The **Quick Test Alerts** buttons fire individual sample alerts.
 
 Set a custom port with `PORT=8080 bun start`.
 
@@ -77,6 +100,7 @@ src/
   server.ts     Bun.serve — HTTP routes, static serving, WebSocket fan-out
   api.ts        REST API router (/api/*)
   engine.ts     domain engine: events → persistence, loyalty, goals, hype, broadcast
+  twitch.ts     real anonymous Twitch IRC connector + event parser
   hype.ts       Hype Train energy engine (the original feature)
   db.ts         bun:sqlite persistence (settings, events, chat, viewers, goals, polls)
   bus.ts        in-process pub/sub bridged to the WebSocket
@@ -107,6 +131,8 @@ GET/POST/PUT/DELETE /api/goals[/:id]
 GET  /api/hype   POST /api/hype/{boost,reset}
 GET/POST /api/poll   POST /api/poll/:id/{vote,end}
 POST /api/tip                  public tip (fires a donation alert)
+GET  /api/integrations         Twitch connection status
+POST /api/integrations/twitch  { enabled, channel } — connect/disconnect
 POST /api/sim/{start,stop}     demo simulator
 ```
 
@@ -114,7 +140,17 @@ POST /api/sim/{start,stop}     demo simulator
 
 ## 🗺️ Notes & roadmap
 
-Fanfare ships in **demo mode**: events are generated locally or via the API rather than pulled from a live platform. The event pipeline is intentionally provider-agnostic — wiring in a real Twitch EventSub / YouTube Live listener is a matter of translating incoming payloads into `emitEvent(...)` calls. Payment processing on the tip page is likewise stubbed for local use.
+Fanfare works with **real Twitch activity today** via the anonymous chat connection
+(chat, subs, gift subs, raids, bits) — plus a built-in **Demo Simulator** for
+testing without a live channel. The event pipeline is provider-agnostic: every
+source just calls `emitEvent(...)` / `emitChat(...)`.
+
+On the roadmap:
+- **Twitch follows via EventSub** (optional, opt-in with a user token) — the one
+  event not available on the anonymous stream.
+- **YouTube Live** chat/superchat ingestion.
+- **Real tip processing** (Stripe / PayPal / Ko-fi webhooks) — the `/tip` page and
+  `POST /api/tip` webhook already model the flow end-to-end.
 
 ## License
 

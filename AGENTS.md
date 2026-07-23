@@ -75,6 +75,7 @@ src/
   server.ts     Bun.serve — HTTP routes, static serving, WebSocket fan-out
   api.ts        REST API router (/api/*)
   engine.ts     events → persistence, loyalty, goals, hype, broadcast
+  twitch.ts     real anonymous Twitch IRC connector + event parser
   hype.ts       Hype Train energy engine (signature feature)
   db.ts         bun:sqlite persistence
   bus.ts        in-process pub/sub bridged to the WebSocket
