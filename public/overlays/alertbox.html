@@ -112,7 +112,24 @@ async function boot() {
   alerts = cfg.alerts || {};
   general = cfg.general || general;
 }
-boot();
+
+// ?demo=<type> renders a sample alert on load — handy while positioning in OBS.
+const SAMPLE = {
+  follow: { name: "NovaByte" },
+  subscription: { name: "NovaByte", tier: 2, months: 6 },
+  gift_sub: { name: "NovaByte", count: 10 },
+  donation: { name: "NovaByte", amount: 25, message: "Best stream on the internet!" },
+  cheer: { name: "NovaByte", amount: 500, message: "cheer1000 lets goooo" },
+  raid: { name: "NovaByte", count: 128 },
+  host: { name: "NovaByte", count: 42 },
+  merch: { name: "NovaByte", message: "a Fanfare Hoodie" },
+  redemption: { name: "NovaByte", message: "Song Request" },
+};
+
+boot().then(() => {
+  const demo = param("demo");
+  if (demo && SAMPLE[demo]) enqueue({ type: demo, ...SAMPLE[demo] });
+});
 
 connect((msg) => {
   if (msg.kind === "alert") enqueue(msg.event);
