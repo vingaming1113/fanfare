@@ -35,14 +35,12 @@ function paint(p) {
     el("div", { class: "sub" }, `${total} vote${total === 1 ? "" : "s"} · type !vote <n> in chat`),
     ...p.options.map((opt, i) => {
       const pct = total ? (p.votes[i] / total) * 100 : 0;
-      const row = el("div", { class: "opt" },
+      return el("div", { class: "opt" },
         el("div", { class: "l" },
           el("span", {}, `${i + 1}. ${opt}`),
           el("span", { class: "pc" }, `${pct.toFixed(0)}%`)),
         el("div", { class: "track" },
-          el("div", { class: "f", style: { background: COLORS[i % COLORS.length] } })));
-      requestAnimationFrame(() => { row.querySelector(".f").style.width = pct + "%"; });
-      return row;
+          el("div", { class: "f", style: { background: COLORS[i % COLORS.length], width: pct + "%" } })));
     }),
   );
 }

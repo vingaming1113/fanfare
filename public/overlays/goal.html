@@ -39,10 +39,9 @@ function paint(g) {
       el("div", { class: "title" }, g.title),
       el("div", { class: "nums" }, `${p}${fmt(g.current)} / ${p}${fmt(g.target)}`),
     ),
-    el("div", { class: "bar" }, el("div", { class: "fill", id: "fill" })),
+    el("div", { class: "bar" }, el("div", { class: "fill", id: "fill", style: { width: pct + "%" } })),
     el("div", { class: "pct" }, `${pct.toFixed(1)}%`),
   );
-  requestAnimationFrame(() => { $("#fill").style.width = pct + "%"; });
 }
 
 async function boot() {
