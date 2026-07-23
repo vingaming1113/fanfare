@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fanfare · Goal</title>
+<link rel="stylesheet" href="/shared/overlay.css" />
+<style>
+  .wrap { position: absolute; inset: 0; display: flex; align-items: flex-start; padding: 16px; }
+  .goal { width: 100%; max-width: 520px; background: rgba(15,15,22,.8); border-radius: 16px; padding: 18px 22px; box-shadow: 0 12px 30px rgba(0,0,0,.4); }
+  .goal .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .goal .title { font-size: 22px; font-weight: 800; }
+  .goal .nums { font-size: 16px; opacity: .85; font-variant-numeric: tabular-nums; }
+  .bar { height: 20px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, var(--c,#a970ff), #fff6); transition: width .8s cubic-bezier(.2,.8,.2,1); box-shadow: 0 0 16px var(--c,#a970ff); }
+  .pct { text-align: right; margin-top: 6px; font-size: 14px; opacity: .8; }
+</style>
+</head>
+<body>
+<div class="wrap"><div class="goal" id="goal"><div class="title">Loading…</div></div></div>
+<script type="module">
+import { $, el, connect, api, param, fmt } from "/shared/sf.js";
+if (param("bg")) document.body.classList.add("preview");
+
+const COLORS = { donation: "#34d399", follower: "#22d3ee", sub: "#a970ff", bits: "#fbbf24" };
+const PREFIX = { donation: "$", follower: "", sub: "", bits: "" };
+const box = $("#goal");
+let goalId = param("id") ? Number(param("id")) : null;
+let current;
+
+function paint(g) {
+  current = g;
+  const pct = Math.min(100, (g.current / g.target) * 100 || 0);
+  const c = COLORS[g.kind] || "#a970ff";
+  const p = PREFIX[g.kind] ?? "";
+  box.style.setProperty("--c", c);
+  box.replaceChildren(
+    el("div", { class: "head" },
+      el("div", { class: "title" }, g.title),
+      el("div", { class: "nums" }, `${p}${fmt(g.current)} / ${p}${fmt(g.target)}`),
+    ),
+    el("div", { class: "bar" }, el("div", { class: "fill", id: "fill" })),
+    el("div", { class: "pct" }, `${pct.toFixed(1)}%`),
+  );
+  requestAnimationFrame(() => { $("#fill").style.width = pct + "%"; });
+}
+
+async function boot() {
+  const goals = await api("goals");
+  const g = goalId ? goals.find((x) => x.id === goalId) : goals.find((x) => x.active);
+  if (g) { goalId = g.id; paint(g); }
+  else box.replaceChildren(el("div", { class: "title" }, "No active goal"));
+}
+boot();
+connect((msg) => {
+  if (msg.kind === "goal" && (goalId === null || msg.goal.id === goalId)) {
+    goalId = msg.goal.id; paint(msg.goal);
+  }
+});
+</script>
+</body>
+</html>
