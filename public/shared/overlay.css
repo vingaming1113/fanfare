@@ -1,0 +1,28 @@
+/* Shared base for OBS browser-source overlays. Transparent by design. */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Preview helper: append ?bg=1 to a widget URL to see it on a checkerboard */
+body.preview {
+  background:
+    repeating-conic-gradient(#2a2a33 0% 25%, #1c1c22 0% 50%) 50% / 40px 40px;
+}
+
+.stack { position: absolute; inset: 0; }
+
+.hidden { display: none !important; }
+
+@keyframes sf-slide-in { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes sf-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sf-pop-in   { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes sf-wipe-in  { from { clip-path: inset(0 100% 0 0); opacity: .2; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
+@keyframes sf-out      { to { opacity: 0; transform: translateY(-20px) scale(.96); } }
