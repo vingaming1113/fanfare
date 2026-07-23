@@ -1,0 +1,27 @@
+{
+  "name": "fanfare",
+  "version": "1.0.0",
+  "description": "Fanfare — a self-hosted, open-source streaming alerts & widgets platform (a Streamlabs-style suite) built on Bun. Alerts, chat box, event list, goals, a public tip page, and an original real-time Hype Train engine.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run src/server.ts",
+    "dev": "bun --watch src/server.ts",
+    "seed": "bun run src/seed.ts"
+  },
+  "keywords": [
+    "streaming",
+    "streamlabs",
+    "obs",
+    "overlay",
+    "alerts",
+    "widgets",
+    "twitch",
+    "bun"
+  ],
+  "author": "vingaming1113",
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.1.0"
+  }
+}

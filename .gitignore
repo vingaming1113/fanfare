@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# bun
+bun.lockb
+
+# runtime data
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+# logs
+*.log
+
+# env
+.env
+.env.local
+
+# os
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/
+.idea/
