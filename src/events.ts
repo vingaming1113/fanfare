@@ -23,6 +23,14 @@ export interface ChatMessage {
   createdAt: number;
 }
 
+export interface TwitchStatus {
+  enabled: boolean;
+  channel: string;
+  connected: boolean;
+  lastError: string | null;
+  since: number | null; // epoch ms connection established
+}
+
 // Every message pushed to widgets/dashboard over the socket.
 export type SocketMessage =
   | { kind: "hello"; channel: string }
@@ -31,6 +39,7 @@ export type SocketMessage =
   | { kind: "goal"; goal: GoalState }
   | { kind: "hype"; state: HypeState }
   | { kind: "poll"; poll: PollState | null }
+  | { kind: "integration"; twitch: TwitchStatus }
   | { kind: "config"; scope: string };
 
 export interface GoalState {
