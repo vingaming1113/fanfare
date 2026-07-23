@@ -183,6 +183,16 @@ export function recentChat(limit = 30): ChatMessage[] {
     .reverse();
 }
 
+// Cap table growth — real chat can be high-volume over long streams.
+export function pruneOldData(chatKeep = 2000, eventKeep = 5000): void {
+  db.query(
+    "DELETE FROM chat WHERE id <= (SELECT MAX(id) FROM chat) - ?",
+  ).run(chatKeep);
+  db.query(
+    "DELETE FROM events WHERE id <= (SELECT MAX(id) FROM events) - ?",
+  ).run(eventKeep);
+}
+
 // ---- loyalty / viewers ----
 export function addPoints(name: string, points: number, minutes = 0): void {
   db.query(
