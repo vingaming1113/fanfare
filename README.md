@@ -29,28 +29,39 @@ No SaaS account, no cloud lock-in. One Bun process serves the control-panel dash
 
 Append `?bg=1` to any overlay to preview it on a checkerboard background.
 
-### 🔴 Real Twitch integration — no login required
-Point Fanfare at a Twitch channel and **real, live activity** flows straight into
-your alerts, goals, hype train and loyalty system. It connects to Twitch chat over
-an **anonymous, read-only IRC-over-WebSocket** guest session — **no OAuth, no API
-key, no bot account, nothing to register.** Just type a channel name and hit
-**Connect** on the dashboard's **Connect** tab.
+### 🔴 Real platform integrations (Twitch + YouTube)
+Point Fanfare at a live channel and **real activity** flows straight into your
+alerts, goals, hype train and loyalty system. Configure everything on the
+dashboard's **Connect** tab.
 
-What comes through live:
+**Twitch — anonymous, zero-setup.** Connects to Twitch chat over an
+**anonymous, read-only IRC-over-WebSocket** guest session — **no OAuth, no API
+key, no bot account.** Just type a channel name and hit Connect.
 
-| Event | Source | Status |
+**Twitch follows — optional login.** Follows are the one event Twitch does *not*
+expose anonymously, so Fanfare adds an opt-in **OAuth + EventSub** layer just for
+them. Register a free app at [dev.twitch.tv](https://dev.twitch.tv/console/apps)
+(OAuth redirect `<your-origin>/auth/twitch/callback`), provide its Client ID/Secret
+via the dashboard or `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` env vars, then
+click **Login with Twitch**. Fanfare subscribes to `channel.follow` (v2) and keeps
+the token refreshed.
+
+**YouTube Live — API key.** Provide a free
+[YouTube Data API key](https://console.cloud.google.com/apis/library/youtube.googleapis.com)
+and a live video URL / ID (or channel ID). Fanfare resolves the active live chat
+and polls it, honoring the API's own polling interval.
+
+| Event | Twitch | YouTube |
 | --- | --- | --- |
-| Chat messages | Twitch IRC `PRIVMSG` | ✅ live |
-| Subscriptions & resubs | `USERNOTICE` | ✅ live |
-| Gift subs & community (mystery) gifts | `USERNOTICE` | ✅ live |
-| Raids | `USERNOTICE` | ✅ live |
-| Bits / cheers | `PRIVMSG` bits tag | ✅ live |
-| Follows | requires authenticated EventSub | ⚠️ not on the anonymous stream |
-| Tips | `/tip` page or `POST /api/tip` webhook | ✅ real |
+| Chat messages | ✅ anonymous | ✅ API key |
+| Subscriptions / memberships | ✅ anonymous | ✅ API key |
+| Gift subs / gifted memberships | ✅ anonymous | ✅ API key |
+| Raids | ✅ anonymous | — |
+| Bits / Super Chats | ✅ anonymous | ✅ API key |
+| Follows | ✅ **login (EventSub)** | — |
+| Tips | ✅ `/tip` page or `POST /api/tip` | ✅ same |
 
-The connector auto-reconnects with backoff and answers Twitch keepalive pings, so
-it survives long streams. Follows are the one common event Twitch does not expose
-anonymously — see the roadmap for the optional EventSub path.
+All connectors auto-reconnect with backoff and survive long streams.
 
 ### 🚂 Hype Train — the original feature
 A real-time **community energy engine**. Every event injects weighted "energy" into a live meter that **decays every second**, so the train only keeps rolling while the community stays active. Fill the meter to level up — each level extends the window and escalates the on-screen celebration (screen shake, confetti burst, sound). If the timer runs out before the next level, the train "leaves the station" and resets. The channel's **all-time record level** is tracked and celebrated when beaten. Every weight and threshold is tunable from the dashboard.
@@ -100,7 +111,10 @@ src/
   server.ts     Bun.serve — HTTP routes, static serving, WebSocket fan-out
   api.ts        REST API router (/api/*)
   engine.ts     domain engine: events → persistence, loyalty, goals, hype, broadcast
-  twitch.ts     real anonymous Twitch IRC connector + event parser
+  twitch.ts     anonymous Twitch IRC connector + event parser
+  eventsub.ts   Twitch OAuth + EventSub (authenticated follow alerts)
+  youtube.ts    YouTube Live connector (chat, Super Chats, memberships)
+  integrations.ts  merges connector statuses and broadcasts them
   hype.ts       Hype Train energy engine (the original feature)
   db.ts         bun:sqlite persistence (settings, events, chat, viewers, goals, polls)
   bus.ts        in-process pub/sub bridged to the WebSocket
@@ -131,26 +145,31 @@ GET/POST/PUT/DELETE /api/goals[/:id]
 GET  /api/hype   POST /api/hype/{boost,reset}
 GET/POST /api/poll   POST /api/poll/:id/{vote,end}
 POST /api/tip                  public tip (fires a donation alert)
-GET  /api/integrations         Twitch connection status
-POST /api/integrations/twitch  { enabled, channel } — connect/disconnect
-POST /api/sim/{start,stop}     demo simulator
+GET  /api/integrations              Twitch + YouTube connection status
+POST /api/integrations/twitch       { enabled, channel } — anonymous connect
+POST /api/integrations/twitch/app   { clientId, clientSecret } — EventSub app
+POST /api/integrations/twitch/logout
+GET  /auth/twitch/login             begin OAuth (redirect)
+GET  /auth/twitch/callback          OAuth redirect target
+POST /api/integrations/youtube      { enabled, apiKey, target }
+POST /api/sim/{start,stop}          demo simulator
 ```
 
 ---
 
 ## 🗺️ Notes & roadmap
 
-Fanfare works with **real Twitch activity today** via the anonymous chat connection
-(chat, subs, gift subs, raids, bits) — plus a built-in **Demo Simulator** for
+Fanfare works with **real Twitch and YouTube activity today**: anonymous Twitch
+chat/subs/gifts/raids/bits, authenticated Twitch follows via EventSub, and YouTube
+live chat / Super Chats / memberships — plus a built-in **Demo Simulator** for
 testing without a live channel. The event pipeline is provider-agnostic: every
 source just calls `emitEvent(...)` / `emitChat(...)`.
 
 On the roadmap:
-- **Twitch follows via EventSub** (optional, opt-in with a user token) — the one
-  event not available on the anonymous stream.
-- **YouTube Live** chat/superchat ingestion.
 - **Real tip processing** (Stripe / PayPal / Ko-fi webhooks) — the `/tip` page and
   `POST /api/tip` webhook already model the flow end-to-end.
+- **Kick / TikTok Live** connectors following the same pattern.
+- **Optional dashboard auth** for exposed/hosted deployments.
 
 ## License
 
