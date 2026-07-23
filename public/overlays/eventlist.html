@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fanfare · Event List</title>
+<link rel="stylesheet" href="/shared/overlay.css" />
+<style>
+  .list { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 14px; gap: 8px; }
+  .row {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(15,15,22,.72); border-radius: 12px; padding: 10px 14px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.3); animation: sf-slide-in .4s ease both;
+    border-left: 4px solid var(--c, #a970ff);
+  }
+  .row .ico { font-size: 26px; }
+  .row .who { font-weight: 800; font-size: 19px; }
+  .row .what { opacity: .8; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="list" id="list"></div>
+<script type="module">
+import { $, el, connect, api, param, fmt } from "/shared/sf.js";
+if (param("bg")) document.body.classList.add("preview");
+const list = $("#list");
+const MAX = Number(param("max", 10));
+let currency = "$";
+
+const META = {
+  follow:       { i: "💜", c: "#22d3ee", t: () => "followed" },
+  subscription: { i: "⭐", c: "#a970ff", t: (e) => `subscribed (T${e.tier ?? 1})` },
+  gift_sub:     { i: "🎁", c: "#f472b6", t: (e) => `gifted ${e.count ?? 1} subs` },
+  donation:     { i: "💰", c: "#34d399", t: (e) => `tipped ${currency}${fmt(e.amount)}` },
+  cheer:        { i: "💎", c: "#fbbf24", t: (e) => `cheered ${fmt(e.amount)} bits` },
+  raid:         { i: "⚔️", c: "#fb7185", t: (e) => `raided (${e.count})` },
+  host:         { i: "📺", c: "#60a5fa", t: (e) => `hosted (${e.count})` },
+  merch:        { i: "🛍️", c: "#c084fc", t: (e) => `bought ${e.message ?? "merch"}` },
+  redemption:   { i: "🎫", c: "#f59e0b", t: (e) => e.message ?? "redeemed" },
+};
+
+function add(ev, prepend = true) {
+  const m = META[ev.type] || { i: "✨", c: "#a970ff", t: () => ev.type };
+  const row = el("div", { class: "row", style: { "--c": m.c } },
+    el("div", { class: "ico" }, m.i),
+    el("div", {},
+      el("div", { class: "who" }, ev.name),
+      el("div", { class: "what" }, m.t(ev)),
+    ),
+  );
+  if (prepend) list.prepend(row); else list.append(row);
+  while (list.children.length > MAX) list.lastChild.remove();
+}
+
+(async () => {
+  const cfg = await api("config"); currency = cfg.general?.currency ?? "$";
+  const rows = await api(`events?limit=${MAX}`);
+  rows.reverse().forEach((e) => add(e, false));
+})();
+connect((msg) => { if (msg.kind === "alert") add(msg.event); });
+</script>
+</body>
+</html>

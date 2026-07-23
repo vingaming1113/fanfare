@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fanfare · Chat Box</title>
+<link rel="stylesheet" href="/shared/overlay.css" />
+<style>
+  .chat { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 16px; gap: 8px; }
+  .line {
+    background: rgba(15,15,22,.72); border-radius: 12px; padding: 10px 14px;
+    font-size: 20px; line-height: 1.35; width: fit-content; max-width: 100%;
+    box-shadow: 0 6px 18px rgba(0,0,0,.35); animation: sf-slide-in .35s ease both;
+    word-break: break-word;
+  }
+  .line .badges { margin-right: 6px; }
+  .line .badge {
+    display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px;
+    border-radius: 6px; margin-right: 3px; vertical-align: middle; text-transform: uppercase;
+  }
+  .badge.mod { background: #22c55e; } .badge.sub { background: #a970ff; }
+  .badge.vip { background: #ec4899; } .badge.broadcaster { background: #ef4444; }
+  .line .user { font-weight: 800; }
+  .line .text { opacity: .96; }
+</style>
+</head>
+<body>
+<div class="chat" id="chat"></div>
+<script type="module">
+import { $, el, connect, api, param, escapeHtml } from "/shared/sf.js";
+if (param("bg")) document.body.classList.add("preview");
+const box = $("#chat");
+const MAX = Number(param("max", 12));
+
+function add(m) {
+  const line = el("div", { class: "line" });
+  if (m.badges?.length) {
+    const b = el("span", { class: "badges" });
+    for (const badge of m.badges) b.append(el("span", { class: `badge ${badge}` }, badge));
+    line.append(b);
+  }
+  line.append(el("span", { class: "user", style: { color: m.color } }, m.name + ": "));
+  line.append(el("span", { class: "text", html: escapeHtml(m.message) }));
+  box.append(line);
+  while (box.children.length > MAX) box.firstChild.remove();
+}
+
+api(`chat?limit=${MAX}`).then((rows) => rows.forEach(add));
+connect((msg) => { if (msg.kind === "chat") add(msg.message); });
+</script>
+</body>
+</html>
