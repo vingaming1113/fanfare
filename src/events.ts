@@ -26,9 +26,28 @@ export interface ChatMessage {
 export interface TwitchStatus {
   enabled: boolean;
   channel: string;
-  connected: boolean;
+  connected: boolean; // anonymous IRC chat/events connection
   lastError: string | null;
   since: number | null; // epoch ms connection established
+  // Authenticated (OAuth + EventSub) layer — unlocks follows.
+  appConfigured: boolean; // client id/secret present
+  authed: boolean; // user has logged in
+  login: string | null; // authenticated broadcaster login
+  followsLive: boolean; // EventSub follow subscription active
+}
+
+export interface YouTubeStatus {
+  enabled: boolean;
+  connected: boolean;
+  target: string; // channel/video the user entered
+  video: string | null; // resolved live video id
+  lastError: string | null;
+  since: number | null;
+}
+
+export interface IntegrationStatus {
+  twitch: TwitchStatus;
+  youtube: YouTubeStatus;
 }
 
 // Every message pushed to widgets/dashboard over the socket.
@@ -39,7 +58,7 @@ export type SocketMessage =
   | { kind: "goal"; goal: GoalState }
   | { kind: "hype"; state: HypeState }
   | { kind: "poll"; poll: PollState | null }
-  | { kind: "integration"; twitch: TwitchStatus }
+  | { kind: "integration"; twitch: TwitchStatus; youtube: YouTubeStatus }
   | { kind: "config"; scope: string };
 
 export interface GoalState {

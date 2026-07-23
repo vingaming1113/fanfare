@@ -11,10 +11,16 @@
 //
 // (Follows are the one common event NOT exposed on this anonymous stream; they
 // require an authenticated EventSub subscription and are noted in the docs.)
-import { publish } from "./bus.ts";
 import { emitChat, emitEvent } from "./engine.ts";
 import { getSetting, setSetting } from "./db.ts";
-import type { TwitchStatus } from "./events.ts";
+
+export interface TwitchIrcStatus {
+  enabled: boolean;
+  channel: string;
+  connected: boolean;
+  lastError: string | null;
+  since: number | null;
+}
 
 const IRC_URL = "wss://irc-ws.chat.twitch.tv:443";
 const SUB_TIER: Record<string, number> = { Prime: 1, "1000": 1, "2000": 2, "3000": 3 };
@@ -78,8 +84,6 @@ function badgesFromTag(tag = ""): string[] {
   return [...new Set(out)];
 }
 
-type StatusListener = (s: TwitchStatus) => void;
-
 class TwitchClient {
   private ws: WebSocket | null = null;
   private channel = "";
@@ -90,6 +94,9 @@ class TwitchClient {
   private manualStop = false;
   private backoff = 1000;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Set by the integrations aggregator to broadcast status changes. */
+  onChange: (() => void) | null = null;
 
   /** Load persisted integration config and connect if enabled. */
   init() {
@@ -102,7 +109,7 @@ class TwitchClient {
     if (this.enabled && this.channel) this.open();
   }
 
-  status(): TwitchStatus {
+  status(): TwitchIrcStatus {
     return {
       enabled: this.enabled,
       channel: this.channel,
@@ -113,7 +120,7 @@ class TwitchClient {
   }
 
   /** Apply new config from the dashboard, persist it, and (re)connect. */
-  configure(enabled: boolean, channel: string): TwitchStatus {
+  configure(enabled: boolean, channel: string): TwitchIrcStatus {
     this.channel = normalizeChannel(channel);
     this.enabled = enabled && !!this.channel;
     setSetting("twitch", { enabled: this.enabled, channel: this.channel });
@@ -261,7 +268,7 @@ class TwitchClient {
     if (this.enabled) this.scheduleReconnect();
   }
   private emit() {
-    publish({ kind: "integration", twitch: this.status() });
+    this.onChange?.();
   }
 }
 

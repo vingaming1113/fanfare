@@ -27,6 +27,9 @@ import {
 } from "./db.ts";
 import { emitChat, emitEvent, hype, type EmitInput } from "./engine.ts";
 import { twitch } from "./twitch.ts";
+import { twitchAuth } from "./eventsub.ts";
+import { youtube } from "./youtube.ts";
+import { integrationStatus, twitchStatus, youtubeStatus } from "./integrations.ts";
 import { publish } from "./bus.ts";
 import {
   randomEvent,
@@ -72,17 +75,33 @@ export async function handleApi(req: Request, url: URL): Promise<Response | null
       leaderboard: leaderboard(10),
       donors: topDonors(10),
       simulator: simulatorRunning(),
-      twitch: twitch.status(),
+      twitch: twitchStatus(),
+      youtube: youtubeStatus(),
       alertTypes: ALERT_TYPES,
     });
   }
 
   // ---- integrations ----
   if (seg[0] === "integrations") {
-    if (method === "GET") return json({ twitch: twitch.status() });
+    if (method === "GET") return json(integrationStatus());
     if (method === "POST" && seg[1] === "twitch") {
+      // sub-actions: app config, logout; default = IRC channel connect
+      if (seg[2] === "app") {
+        const b = await body<{ clientId: string; clientSecret: string }>(req);
+        twitchAuth.setApp(b.clientId ?? "", b.clientSecret ?? "");
+        return json(twitchStatus());
+      }
+      if (seg[2] === "logout") {
+        twitchAuth.logout();
+        return json(twitchStatus());
+      }
       const b = await body<{ enabled: boolean; channel: string }>(req);
-      return json(twitch.configure(!!b.enabled, b.channel ?? ""));
+      twitch.configure(!!b.enabled, b.channel ?? "");
+      return json(twitchStatus());
+    }
+    if (method === "POST" && seg[1] === "youtube") {
+      const b = await body<{ enabled: boolean; apiKey: string; target: string }>(req);
+      return json(youtube.configure(!!b.enabled, b.apiKey ?? "", b.target ?? ""));
     }
   }
 

@@ -7,14 +7,15 @@ import { APP, PORT } from "./config.ts";
 import { handleApi } from "./api.ts";
 import { subscribe } from "./bus.ts";
 import { hype } from "./engine.ts";
-import { twitch } from "./twitch.ts";
+import { twitchAuth } from "./eventsub.ts";
+import { initIntegrations, integrationStatus } from "./integrations.ts";
 import { activePoll, getGeneral, pruneOldData } from "./db.ts";
 import { seed } from "./seed.ts";
 import type { SocketMessage } from "./events.ts";
 
 seed();
 hype.start();
-twitch.init();
+initIntegrations();
 
 // Keep the database bounded during long, high-volume real streams.
 pruneOldData();
@@ -59,6 +60,21 @@ const server = serve({
       return new Response("expected websocket", { status: 426 });
     }
 
+    // Twitch OAuth flow (authenticated follows via EventSub)
+    if (url.pathname === "/auth/twitch/login") {
+      const dest = twitchAuth.loginUrl(url.origin);
+      if (!dest) return new Response("Twitch app not configured", { status: 400 });
+      return Response.redirect(dest, 302);
+    }
+    if (url.pathname === "/auth/twitch/callback") {
+      await twitchAuth.handleCallback(
+        url.searchParams.get("code") ?? "",
+        url.searchParams.get("state") ?? "",
+        url.origin,
+      );
+      return Response.redirect("/dashboard#connect", 302);
+    }
+
     // REST API
     const api = await handleApi(req, url);
     if (api) return api;
@@ -81,7 +97,7 @@ const server = serve({
       // Prime overlays with current live state.
       ws.send(JSON.stringify({ kind: "hype", state: hype.state() } satisfies SocketMessage));
       ws.send(JSON.stringify({ kind: "poll", poll: activePoll() } satisfies SocketMessage));
-      ws.send(JSON.stringify({ kind: "integration", twitch: twitch.status() } satisfies SocketMessage));
+      ws.send(JSON.stringify({ kind: "integration", ...integrationStatus() } satisfies SocketMessage));
     },
     message() {
       // Widgets are receive-only; ignore inbound frames.
