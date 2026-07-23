@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Support the stream · Fanfare</title>
+<style>
+  :root { --accent: #a970ff; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif; min-height: 100vh;
+    background: radial-gradient(900px 600px at 50% -10%, #241247, #0d0d12 60%);
+    color: #eee; display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .card { width: 100%; max-width: 440px; background: #16161f; border: 1px solid #2a2a38; border-radius: 20px; padding: 30px; box-shadow: 0 24px 60px rgba(0,0,0,.5); }
+  .logo { font-size: 40px; text-align: center; }
+  h1 { text-align: center; font-size: 24px; margin: 8px 0 2px; }
+  .sub { text-align: center; color: #9a9ab0; font-size: 14px; margin-bottom: 22px; }
+  label { display: block; font-size: 13px; color: #9a9ab0; margin: 14px 0 6px; }
+  input, textarea { width: 100%; background: #0d0d12; border: 1px solid #2a2a38; border-radius: 10px; padding: 12px; color: #eee; font: inherit; }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 70px; }
+  .amounts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+  .amounts button { background: #1e1e2a; border: 1px solid #2a2a38; border-radius: 10px; padding: 12px 0; color: #eee; font-weight: 700; cursor: pointer; }
+  .amounts button.sel, .amounts button:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 25%, transparent); }
+  .give { width: 100%; margin-top: 22px; padding: 15px; border: none; border-radius: 12px; background: linear-gradient(135deg, var(--accent), #22d3ee); color: #120a1f; font-weight: 800; font-size: 17px; cursor: pointer; }
+  .give:hover { filter: brightness(1.08); }
+  .note { text-align: center; color: #6b6b80; font-size: 12px; margin-top: 16px; }
+  .ok { text-align: center; padding: 30px 10px; }
+  .ok .big { font-size: 54px; }
+  .ok h2 { margin: 10px 0 6px; }
+  .ok p { color: #9a9ab0; }
+  .ghost { background: transparent; border: 1px solid #2a2a38; color: #eee; margin-top: 14px; padding: 12px; border-radius: 12px; width: 100%; cursor: pointer; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="logo">🎺</div>
+  <h1 id="chan">Support the stream</h1>
+  <p class="sub">Send a tip and pop up live on stream</p>
+
+  <label for="name">Your name</label>
+  <input id="name" type="text" placeholder="Anonymous" maxlength="40" />
+
+  <label>Amount</label>
+  <div class="amounts" id="amounts"></div>
+  <input id="custom" type="number" min="1" step="1" placeholder="Custom amount" style="margin-top:8px" />
+
+  <label for="msg">Message (optional)</label>
+  <textarea id="msg" maxlength="200" placeholder="Say something nice…"></textarea>
+
+  <button class="give" id="give">Send Tip</button>
+  <p class="note">Demo mode — no real payment is processed.</p>
+</div>
+
+<script type="module">
+import { $, api } from "/shared/sf.js";
+let currency = "$", chosen = 5;
+const amounts = [3, 5, 10, 25, 50, 100];
+
+(async () => {
+  const cfg = await api("config");
+  currency = cfg.general?.currency ?? "$";
+  document.documentElement.style.setProperty("--accent", cfg.general?.theme ?? "#a970ff");
+  $("#chan").textContent = `Support ${cfg.general?.channelName ?? "the stream"}`;
+  const box = $("#amounts");
+  amounts.forEach((a, i) => {
+    const b = document.createElement("button");
+    b.textContent = currency + a;
+    if (i === 1) b.classList.add("sel");
+    b.onclick = () => { chosen = a; $("#custom").value = ""; [...box.children].forEach((c) => c.classList.remove("sel")); b.classList.add("sel"); };
+    box.append(b);
+  });
+})();
+
+$("#custom").addEventListener("input", (e) => {
+  chosen = +e.target.value || 0;
+  [...$("#amounts").children].forEach((c) => c.classList.remove("sel"));
+});
+
+$("#give").addEventListener("click", async () => {
+  const amount = +($("#custom").value || chosen);
+  if (!amount || amount <= 0) return alert("Please choose an amount");
+  await api("tip", "POST", { name: $("#name").value.trim() || "Anonymous", amount, message: $("#msg").value.trim() });
+  $("#card").innerHTML = `
+    <div class="ok">
+      <div class="big">🎉</div>
+      <h2>Thank you${$("#name").value.trim() ? ", " + $("#name").value.trim() : ""}!</h2>
+      <p>Your ${currency}${amount} tip is on its way to the stream.</p>
+      <button class="ghost" onclick="location.reload()">Send another</button>
+    </div>`;
+});
+</script>
+</body>
+</html>
