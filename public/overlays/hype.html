@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fanfare · Hype Train</title>
+<link rel="stylesheet" href="/shared/overlay.css" />
+<style>
+  .wrap { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 4vh; }
+  .train {
+    width: 640px; background: linear-gradient(135deg, rgba(30,12,48,.92), rgba(12,12,28,.92));
+    border-radius: 20px; padding: 22px 26px; box-shadow: 0 20px 60px rgba(0,0,0,.55);
+    border: 1px solid rgba(169,112,255,.4); transform-origin: top center;
+    transition: transform .3s ease, box-shadow .3s ease, opacity .4s ease;
+  }
+  .train.hidden { opacity: 0; transform: translateY(-30px) scale(.95); pointer-events: none; }
+  .top { display: flex; align-items: center; gap: 14px; }
+  .loco { font-size: 46px; }
+  .heading { flex: 1; }
+  .heading .k { font-size: 13px; letter-spacing: 3px; text-transform: uppercase; opacity: .7; }
+  .heading .lvl { font-size: 30px; font-weight: 900; background: linear-gradient(90deg,#a970ff,#22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .timer { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; color: #fbbf24; }
+  .cars { display: flex; gap: 6px; margin: 16px 0 10px; }
+  .car { flex: 1; height: 12px; border-radius: 6px; background: rgba(255,255,255,.1); overflow: hidden; }
+  .car.done { background: linear-gradient(90deg,#a970ff,#22d3ee); box-shadow: 0 0 14px #a970ff; }
+  .car .p { height: 100%; width: 0%; background: linear-gradient(90deg,#f472b6,#fbbf24); transition: width .5s ease; }
+  .foot { display: flex; justify-content: space-between; font-size: 15px; opacity: .85; }
+  .foot .contrib b { color: #f472b6; }
+  .record { color: #fbbf24; font-weight: 800; }
+  @keyframes shake { 0%,100%{transform:none} 25%{transform:translateX(-6px) rotate(-1deg)} 75%{transform:translateX(6px) rotate(1deg)} }
+  .train.levelup { animation: shake .5s ease; box-shadow: 0 0 0 3px #fbbf24, 0 20px 60px rgba(0,0,0,.55); }
+  .burst { position: absolute; font-size: 40px; pointer-events: none; animation: rise 1.1s ease forwards; }
+  @keyframes rise { from { opacity: 1; transform: translateY(0) scale(1);} to { opacity: 0; transform: translateY(-140px) scale(1.6);} }
+</style>
+</head>
+<body>
+<div class="wrap"><div class="train hidden" id="train"></div></div>
+<script type="module">
+import { $, el, connect, param, playSound } from "/shared/sf.js";
+if (param("bg")) document.body.classList.add("preview");
+
+const train = $("#train");
+let lastLevel = 0, lastActive = false, endsAt = null;
+
+function build(s) {
+  const cars = el("div", { class: "cars" });
+  for (let i = 1; i <= s.maxLevel; i++) {
+    const done = i < s.level;
+    const car = el("div", { class: "car" + (done ? " done" : "") });
+    if (i === s.level) car.append(el("div", { class: "p", id: "curp" }));
+    cars.append(car);
+  }
+  train.replaceChildren(
+    el("div", { class: "top" },
+      el("div", { class: "loco" }, "🚂"),
+      el("div", { class: "heading" },
+        el("div", { class: "k" }, "Hype Train"),
+        el("div", { class: "lvl" }, `Level ${s.level}`),
+      ),
+      el("div", { class: "timer", id: "timer" }, "--"),
+    ),
+    cars,
+    el("div", { class: "foot" },
+      el("div", { class: "contrib" }, s.topContributor
+        ? el("span", { html: `MVP <b>${s.topContributor.name}</b>` })
+        : "Get hyped!"),
+      s.level >= s.allTimeRecordLevel && s.level > 1
+        ? el("div", { class: "record" }, "🏆 RECORD!")
+        : el("div", {}, `Best: Lv ${s.allTimeRecordLevel}`),
+    ),
+  );
+  const p = $("#curp"); if (p) p.style.width = (s.progress * 100) + "%";
+}
+
+function celebrate() {
+  playSound("sparkle", 0.7);
+  train.classList.add("levelup");
+  setTimeout(() => train.classList.remove("levelup"), 600);
+  const r = train.getBoundingClientRect();
+  for (let i = 0; i < 12; i++) {
+    const b = el("div", { class: "burst" }, ["🎉","✨","🎊","💜","⭐"][i % 5]);
+    b.style.left = (r.left + Math.random() * r.width) + "px";
+    b.style.top = (r.top + 20) + "px";
+    document.body.append(b);
+    setTimeout(() => b.remove(), 1200);
+  }
+}
+
+function update(s) {
+  if (!s.active) { train.classList.add("hidden"); lastActive = false; lastLevel = 0; endsAt = null; return; }
+  const wasHidden = train.classList.contains("hidden");
+  train.classList.remove("hidden");
+  endsAt = s.expiresAt;
+  build(s);
+  if (s.level > lastLevel && (!wasHidden || lastActive)) celebrate();
+  else if (wasHidden) playSound("chime", 0.5);
+  lastLevel = s.level; lastActive = true;
+}
+
+setInterval(() => {
+  const t = $("#timer");
+  if (t && endsAt) {
+    const left = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+    t.textContent = left + "s";
+    t.style.color = left <= 10 ? "#ef4444" : "#fbbf24";
+  }
+}, 250);
+
+connect((msg) => { if (msg.kind === "hype") update(msg.state); });
+</script>
+</body>
+</html>
