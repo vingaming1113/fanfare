@@ -7,12 +7,18 @@ import { APP, PORT } from "./config.ts";
 import { handleApi } from "./api.ts";
 import { subscribe } from "./bus.ts";
 import { hype } from "./engine.ts";
-import { activePoll, getGeneral } from "./db.ts";
+import { twitch } from "./twitch.ts";
+import { activePoll, getGeneral, pruneOldData } from "./db.ts";
 import { seed } from "./seed.ts";
 import type { SocketMessage } from "./events.ts";
 
 seed();
 hype.start();
+twitch.init();
+
+// Keep the database bounded during long, high-volume real streams.
+pruneOldData();
+setInterval(pruneOldData, 10 * 60 * 1000);
 
 const PUBLIC = new URL("../public/", import.meta.url).pathname;
 const WS_TOPIC = "fanfare";
@@ -75,6 +81,7 @@ const server = serve({
       // Prime overlays with current live state.
       ws.send(JSON.stringify({ kind: "hype", state: hype.state() } satisfies SocketMessage));
       ws.send(JSON.stringify({ kind: "poll", poll: activePoll() } satisfies SocketMessage));
+      ws.send(JSON.stringify({ kind: "integration", twitch: twitch.status() } satisfies SocketMessage));
     },
     message() {
       // Widgets are receive-only; ignore inbound frames.

@@ -26,6 +26,7 @@ import {
   votePoll,
 } from "./db.ts";
 import { emitChat, emitEvent, hype, type EmitInput } from "./engine.ts";
+import { twitch } from "./twitch.ts";
 import { publish } from "./bus.ts";
 import {
   randomEvent,
@@ -71,8 +72,18 @@ export async function handleApi(req: Request, url: URL): Promise<Response | null
       leaderboard: leaderboard(10),
       donors: topDonors(10),
       simulator: simulatorRunning(),
+      twitch: twitch.status(),
       alertTypes: ALERT_TYPES,
     });
+  }
+
+  // ---- integrations ----
+  if (seg[0] === "integrations") {
+    if (method === "GET") return json({ twitch: twitch.status() });
+    if (method === "POST" && seg[1] === "twitch") {
+      const b = await body<{ enabled: boolean; channel: string }>(req);
+      return json(twitch.configure(!!b.enabled, b.channel ?? ""));
+    }
   }
 
   // ---- config ----
