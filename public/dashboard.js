@@ -363,42 +363,103 @@ function renderWidgets() {
 // ---------- CONNECT (real integrations) ----------
 function renderConnect() {
   const root = $("#sec-connect");
-  const tw = state.twitch || { enabled: false, channel: "", connected: false };
+  const tw = state.twitch || {};
+  const yt = state.youtube || {};
   const channel = input("text", tw.channel || state.general?.channelName || "", { placeholder: "your_twitch_channel" });
+
+  // Twitch OAuth (follows) sub-card — shown inline.
+  const authCard = el("div", { id: "twAuthCard", style: { marginTop: "16px", paddingTop: "14px", borderTop: "1px solid var(--line)" } });
+  renderTwitchAuth(authCard, tw);
+
+  const ytKey = input("text", yt.apiKey || "", { placeholder: "YouTube Data API key" });
+  const ytTarget = input("text", yt.target || "", { placeholder: "Live video URL, video ID, or channel ID (UC…)" });
+
   root.replaceChildren(
+    // --- Twitch ---
     el("div", { class: "card", style: { marginBottom: "16px" } },
-      el("h3", {}, "Twitch"),
+      el("h3", {}, "🟣 Twitch"),
       el("p", { style: { color: "var(--muted)", fontSize: "14px", marginBottom: "14px" } },
-        "Connect to a live Twitch channel and real activity flows straight into your alerts, goals, hype train and loyalty — ",
-        el("strong", {}, "no login, OAuth or API key needed"), " (anonymous read-only chat connection)."),
+        "Connect to a live channel and real activity flows into your alerts, goals, hype train and loyalty — ",
+        el("strong", {}, "no login or API key needed"), " for chat, subs, gifts, raids and bits (anonymous connection)."),
       el("div", { class: "spread", id: "twStatusRow", style: { marginBottom: "14px" } }, twStatusBadge(tw)),
       field("Channel name", channel),
       el("div", { class: "row" },
         el("button", { class: "btn primary", onClick: async () => {
-          state.twitch = await api("integrations/twitch", "POST", { enabled: true, channel: channel.value });
-          paintTwitch(state.twitch); toast("Connecting to Twitch…");
+          paintTwitch(await api("integrations/twitch", "POST", { enabled: true, channel: channel.value }));
+          toast("Connecting to Twitch…");
         } }, "Connect"),
         el("button", { class: "btn danger", onClick: async () => {
-          state.twitch = await api("integrations/twitch", "POST", { enabled: false, channel: channel.value });
-          paintTwitch(state.twitch); toast("Disconnected");
+          paintTwitch(await api("integrations/twitch", "POST", { enabled: false, channel: channel.value }));
+          toast("Disconnected");
+        } }, "Disconnect")),
+      authCard),
+
+    // --- YouTube ---
+    el("div", { class: "card", style: { marginBottom: "16px" } },
+      el("h3", {}, "🔴 YouTube Live"),
+      el("p", { style: { color: "var(--muted)", fontSize: "14px", marginBottom: "14px" } },
+        "Point Fanfare at a live stream with a free ",
+        el("a", { href: "https://console.cloud.google.com/apis/library/youtube.googleapis.com", target: "_blank" }, "YouTube Data API key"),
+        ". Brings in real chat, Super Chats (tips) and new/gifted memberships."),
+      el("div", { class: "spread", id: "ytStatusRow", style: { marginBottom: "14px" } }, ytStatusBadge(yt)),
+      field("Data API key", ytKey),
+      field("Live video or channel", ytTarget),
+      el("div", { class: "row" },
+        el("button", { class: "btn primary", onClick: async () => {
+          paintYouTube(await api("integrations/youtube", "POST", { enabled: true, apiKey: ytKey.value, target: ytTarget.value }));
+          toast("Connecting to YouTube…");
+        } }, "Connect"),
+        el("button", { class: "btn danger", onClick: async () => {
+          paintYouTube(await api("integrations/youtube", "POST", { enabled: false, apiKey: ytKey.value, target: ytTarget.value }));
+          toast("Disconnected");
         } }, "Disconnect"))),
+
+    // --- reference ---
     el("div", { class: "card" },
       el("h3", {}, "What comes through"),
-      el("table", {},
-        el("tbody", {},
-          trow("💬 Chat messages", "Live", "var(--good)"),
-          trow("⭐ Subs & resubs", "Live", "var(--good)"),
-          trow("🎁 Gift subs & community gifts", "Live", "var(--good)"),
-          trow("⚔️ Raids", "Live", "var(--good)"),
-          trow("💎 Bits / cheers", "Live", "var(--good)"),
-          trow("💜 Follows", "Needs auth (EventSub)", "var(--muted)"),
-          trow("💰 Tips", "Via /tip page or webhook", "var(--muted)"))),
-      el("p", { style: { color: "var(--muted)", fontSize: "13px", marginTop: "10px" } },
-        "Follows aren't exposed on Twitch's anonymous stream. Everything else is real and live.")),
+      el("table", {}, el("tbody", {},
+        trow("💬 Chat messages", "Twitch · YouTube"),
+        trow("⭐ Subs / memberships", "Twitch · YouTube"),
+        trow("🎁 Gift subs / gifted memberships", "Twitch · YouTube"),
+        trow("⚔️ Raids", "Twitch"),
+        trow("💎 Bits / Super Chats", "Twitch · YouTube"),
+        trow("💜 Follows", tw.authed ? "Twitch (live via EventSub)" : "Twitch (log in below)"),
+        trow("💰 Tips", "/tip page or POST /api/tip")))),
   );
 }
-function trow(label, status, color) {
-  return el("tr", {}, el("td", {}, label), el("td", { class: "num", style: { color } }, status));
+
+function renderTwitchAuth(host, tw) {
+  const rows = [
+    el("div", { style: { fontWeight: "700", marginBottom: "6px" } }, "💜 Follows — authenticated (EventSub)"),
+  ];
+  if (tw.authed) {
+    rows.push(el("div", { style: { color: "var(--muted)", fontSize: "14px", marginBottom: "10px" } },
+      `Logged in as ${tw.login}. Follows: `,
+      el("strong", { style: { color: tw.followsLive ? "var(--good)" : "var(--warn)" } }, tw.followsLive ? "live" : "starting…")));
+    rows.push(el("button", { class: "btn sm", onClick: async () => { paintTwitch(await api("integrations/twitch/logout", "POST")); toast("Logged out"); } }, "Log out"));
+  } else if (tw.appConfigured) {
+    rows.push(el("p", { style: { color: "var(--muted)", fontSize: "13px", marginBottom: "10px" } },
+      "Log in with your Twitch account to receive real follow alerts."));
+    rows.push(el("a", { class: "btn primary sm", href: "/auth/twitch/login" }, "Login with Twitch"));
+  } else {
+    const cid = input("text", "", { placeholder: "Client ID" });
+    const csec = input("text", "", { placeholder: "Client Secret" });
+    rows.push(el("p", { style: { color: "var(--muted)", fontSize: "13px", marginBottom: "10px" } },
+      "Optional: to enable follow alerts, create an app at ",
+      el("a", { href: "https://dev.twitch.tv/console/apps", target: "_blank" }, "dev.twitch.tv"),
+      " with OAuth redirect ", el("code", {}, `${location.origin}/auth/twitch/callback`),
+      ", then paste its credentials (or set TWITCH_CLIENT_ID/SECRET env vars)."));
+    rows.push(el("div", { class: "mini" }, field("Client ID", cid), field("Client Secret", csec)));
+    rows.push(el("button", { class: "btn sm", onClick: async () => {
+      paintTwitch(await api("integrations/twitch/app", "POST", { clientId: cid.value, clientSecret: csec.value }));
+      toast("Saved — now log in"); switchTo("connect");
+    } }, "Save app credentials"));
+  }
+  host.replaceChildren(...rows);
+}
+
+function trow(label, status) {
+  return el("tr", {}, el("td", {}, label), el("td", { class: "num", style: { color: "var(--muted)" } }, status));
 }
 function twStatusBadge(tw) {
   const on = tw.connected;
@@ -406,14 +467,28 @@ function twStatusBadge(tw) {
   const label = on ? `Connected to #${tw.channel}` : tw.enabled ? `Connecting to #${tw.channel}…` : "Not connected";
   return el("span", { style: { fontWeight: "700" } }, el("span", { class: "dot", style: { background: color } }), " " + label + (tw.lastError ? ` — ${tw.lastError}` : ""));
 }
+function ytStatusBadge(yt) {
+  const on = yt.connected;
+  const color = on ? "var(--good)" : yt.enabled ? "var(--warn)" : "var(--muted)";
+  const label = on ? `Live${yt.video ? ` on ${yt.video}` : ""}` : yt.enabled ? "Connecting…" : "Not connected";
+  return el("span", { style: { fontWeight: "700" } }, el("span", { class: "dot", style: { background: color } }), " " + label + (yt.lastError ? ` — ${yt.lastError}` : ""));
+}
 function paintTwitch(tw) {
   if (!tw) return;
   state.twitch = tw;
   const row = $("#twStatusRow");
   if (row) row.replaceChildren(twStatusBadge(tw));
+  const auth = $("#twAuthCard");
+  if (auth) renderTwitchAuth(auth, tw);
   const dot = $("#twdot"), st = $("#twstate");
   if (dot) { dot.classList.toggle("on", tw.connected); dot.style.background = tw.connected ? "" : tw.enabled ? "var(--warn)" : ""; }
   if (st) st.textContent = tw.connected ? `#${tw.channel}` : tw.enabled ? "connecting" : "off";
+}
+function paintYouTube(yt) {
+  if (!yt) return;
+  state.youtube = yt;
+  const row = $("#ytStatusRow");
+  if (row) row.replaceChildren(ytStatusBadge(yt));
 }
 
 // ---------- SETTINGS ----------
@@ -520,7 +595,7 @@ function handleLive(msg) {
     if (cf) { cf.append(chatItem(msg.message)); while (cf.children.length > 40) cf.firstChild.remove(); cf.scrollTop = cf.scrollHeight; }
   }
   if (msg.kind === "poll") { state.poll = msg.poll; if ($("#activePoll")) paintPoll(msg.poll); }
-  if (msg.kind === "integration") paintTwitch(msg.twitch);
+  if (msg.kind === "integration") { paintTwitch(msg.twitch); paintYouTube(msg.youtube); }
   if (msg.kind === "goal") {
     const list = state.goals || [];
     const idx = list.findIndex((g) => g.id === msg.goal.id);
